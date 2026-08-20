@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explorador · Blob Storage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F1F2F5;
+    --surface: #FFFFFF;
+    --surface-hover: #EAECF1;
+    --ink: #14171F;
+    --ink-soft: #5B6472;
+    --ink-faint: #97A0AD;
+    --border: #E1E4EA;
+    --accent: #2A46C4;
+    --accent-ink: #1C2E85;
+    --accent-soft: #EBEEFC;
+    --danger: #C93A4E;
+    --danger-soft: #FBEAED;
+    --success: #1C8A5C;
+    --success-soft: #E7F6EE;
+    --radius: 10px;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+  a { color: inherit; }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  #app {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+    min-height: 100%;
+  }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  header.top h1 {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .conn-info {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  .conn-info b { color: var(--ink-soft); font-weight: 500; }
+
+  nav.breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  nav.breadcrumb .sep { color: var(--ink-faint); }
+  nav.breadcrumb .crumb {
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  nav.breadcrumb .crumb:hover { background: var(--accent-soft); color: var(--accent-ink); }
+  nav.breadcrumb .crumb.current {
+    color: var(--accent);
+    font-weight: 600;
+    cursor: default;
+  }
+  nav.breadcrumb .crumb.current:hover { background: none; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .toolbar .hint { font-size: 12.5px; color: var(--ink-faint); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+  }
+  .btn:hover { background: var(--surface-hover); }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-ink); }
+
+  main#dropzone {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    min-height: 320px;
+    position: relative;
+  }
+
+  table.file-list { width: 100%; border-collapse: collapse; }
+  table.file-list thead th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.file-list th.col-size, table.file-list th.col-date { text-align: right; }
+  table.file-list td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.file-list tr:last-child td { border-bottom: none; }
+  table.file-list tr.row-item:hover { background: var(--surface-hover); }
+
+  .name-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .name-cell .icon { flex: none; color: var(--ink-faint); }
+  .row-folder .name-cell .icon { color: var(--accent); }
+  .name-cell .label {
+    cursor: default;
+    font-size: 13.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-folder .name-cell .label { cursor: pointer; font-weight: 500; }
+  .row-folder .name-cell .label:hover { text-decoration: underline; }
+
+  .col-size, .col-date {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .col-actions { text-align: right; white-space: nowrap; }
+  .icon-btn {
+    border: none;
+    background: none;
+    color: var(--ink-faint);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: inline-flex;
+  }
+  .icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+  .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+
+  .empty-state {
+    padding: 70px 20px;
+    text-align: center;
+    color: var(--ink-faint);
+  }
+  .empty-state .icon { color: var(--border); margin-bottom: 10px; }
+  .empty-state p { margin: 4px 0; font-size: 13.5px; }
+  .empty-state .mono { font-family: var(--mono); font-size: 12px; }
+
+  /* Overlay de arrastre a pantalla completa */
+  .drag-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 23, 31, 0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    pointer-events: none;
+  }
+  body.dragging .drag-overlay { display: flex; }
+  .drag-overlay-inner {
+    font-family: var(--mono);
+    color: #fff;
+    font-size: 18px;
+    border: 1px dashed rgba(255,255,255,.4);
+    border-radius: 12px;
+    padding: 34px 48px;
+  }
+  .drag-overlay-inner .prompt { color: #7C93FF; margin-right: 8px; }
+  .drag-overlay-inner .path { color: #fff; font-weight: 600; }
+  .cursor { display: inline-block; margin-left: 4px; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Panel de subidas */
+  #upload-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 320px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(20,23,31,.14);
+    display: none;
+    z-index: 40;
+  }
+  #upload-panel.visible { display: block; }
+  #upload-panel .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+    font-size: 12.5px; font-weight: 600;
+  }
+  #upload-panel .panel-header button { border: none; background: none; color: var(--ink-faint); cursor: pointer; font-size: 16px; line-height: 1; }
+  .upload-row { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .upload-row:last-child { border-bottom: none; }
+  .upload-row .u-name {
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;
+  }
+  .upload-row .u-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .upload-row .u-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width .15s; }
+  .upload-row.done .u-bar-fill { background: var(--success); width: 100% !important; }
+  .upload-row.error .u-bar-fill { background: var(--danger); width: 100% !important; }
+  .upload-row .u-status { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
+  .upload-row.error .u-status { color: var(--danger); }
+
+  /* Toasts */
+  #toasts { position: fixed; left: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 60; }
+  .toast {
+    font-size: 13px; padding: 10px 14px; border-radius: 8px;
+    background: var(--ink); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    animation: rise .15s ease-out;
+  }
+  .toast.error { background: var(--danger); }
+  .toast.success { background: var(--success); }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  input[type=file] { display: none; }
+
+  @media (max-width: 560px) {
+    table.file-list th.col-date, table.file-list td.col-date { display: none; }
+    #upload-panel { left: 12px; right: 12px; width: auto; bottom: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header class="top">
+    <h1>Explorador de archivos</h1>
+    <div class="conn-info"><b id="conn-account">-</b> / <span id="conn-container">-</span></div>
+  </header>
+
+  <nav class="breadcrumb" id="breadcrumb"></nav>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" id="browse-btn">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg>
+      Subir carpeta
+    </button>
+    <span class="hint">o arrastra una carpeta a cualquier parte de esta página</span>
+  </div>
+
+  <main id="dropzone">
+    <table class="file-list" id="file-table" style="display:none">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th class="col-size">Tamaño</th>
+          <th class="col-date">Modificado</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody id="file-tbody"></tbody>
+    </table>
+    <div class="empty-state" id="empty-state">
+      <svg class="icon" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+      <p>Esta carpeta está vacía</p>
+      <p class="mono">arrastra una carpeta aquí para subirla</p>
+    </div>
+  </main>
+</div>
+
+<div class="drag-overlay" id="drag-overlay">
+  <div class="drag-overlay-inner">
+    <span class="prompt">❯</span>suelta para subir a <span class="path" id="drag-target-path">/</span><span class="cursor">▌</span>
+  </div>
+</div>
+
+<div id="upload-panel">
+  <div class="panel-header">
+    <span id="upload-panel-title">Subiendo…</span>
+    <button id="upload-panel-close" aria-label="Cerrar">×</button>
+  </div>
+  <div id="upload-rows"></div>
+</div>
+
+<div id="toasts"></div>
+
+<input type="file" id="folder-input" webkitdirectory multiple>
+
+<script>
+// ============================================================================
+// CONFIGURACIÓN — reemplaza estos 3 valores antes de usar
+// ============================================================================
+const CONFIG = {
+  accountName: 'TU_STORAGE_ACCOUNT',                                   // ej. "midatalake"
+  containerName: 'TU_CONTENEDOR',                                       // ej. "entrada"
+  sasEndpoint: 'https://TU-FUNCTION-APP.azurewebsites.net/api/sas',     // tu Function App
+  sasFunctionKey: 'TU_FUNCTION_KEY_AQUI'                                // clave de función (ver README)
+};
+// ============================================================================
+
+let currentPath = '';   // '' = raíz, o algo como "fotos/2024/"
+let sasCache = null;    // { token, expiresOn }
+
+// ---------- SAS token ----------
+async function getSasToken() {
+  if (sasCache && new Date(sasCache.expiresOn).getTime() > Date.now() + 60000) {
+    return sasCache.token;
+  }
+  const url = CONFIG.sasFunctionKey
+    ? `${CONFIG.sasEndpoint}?code=${encodeURIComponent(CONFIG.sasFunctionKey)}`
+    : CONFIG.sasEndpoint;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('No se pudo obtener el token de acceso (revisa CONFIG y CORS)');
+  const data = await res.json();
+  sasCache = { token: data.sasToken, expiresOn: data.expiresOn };
+  return sasCache.token;
+}
+
+// ---------- Helpers REST sobre Blob Storage ----------
+function blobUrl(path = '') {
+  const base = `https://${CONFIG.accountName}.blob.core.windows.net/${CONFIG.containerName}`;
+  if (!path) return base;
+  return base + '/' + path.split('/').map(encodeURIComponent).join('/');
+}
+
+async function listBlobs(prefix) {
+  const sas = await getSasToken();
+  let marker = '';
+  const folders = [];
+  const files = [];
+  do {
+    const qs = new URLSearchParams({ restype: 'container', comp: 'list', delimiter: '/', prefix });
+    if (marker) qs.set('marker', marker);
+    const res = await fetch(`${blobUrl()}?${qs.toString()}&${sas}`);
+    if (!res.ok) throw new Error('Error al listar archivos (' + res.status + ')');
+    const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+    xml.querySelectorAll('BlobPrefix > Name').forEach(n => folders.push(n.textContent));
+    xml.querySelectorAll('Blobs > Blob').forEach(el => {
+      files.push({
+        name: el.querySelector('Name').textContent,
+        size: parseInt(el.querySelector('Properties > Content-Length')?.textContent || '0', 10),
+        lastModified: el.querySelector('Properties > Last-Modified')?.textContent || ''
+      });
+    });
+    const nextMarker = xml.querySelector('NextMarker');
+    marker = nextMarker ? nextMarker.textContent : '';
+  } while (marker);
+  return { folders, files };
+}
+
+async function listAllUnderPrefix(prefix) {
+  // Listado plano (sin delimiter) para borrado recursivo de "carpetas"
+  const sas = await getSasToken();
+  let marker = '';
+  const names = [];
+  do {
+    const qs = new URLSearchParams({ restype: 'container', comp: 'list', prefix });
+    if (marker) qs.set('marker', marker);
+    const res = await fetch(`${blobUrl()}?${qs.toString()}&${sas}`);
+    if (!res.ok) throw new Error('Error al listar (' + res.status + ')');
+    const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+    xml.querySelectorAll('Blobs > Blob > Name').forEach(n => names.push(n.textContent));
+    const nextMarker = xml.querySelector('NextMarker');
+    marker = nextMarker ? nextMarker.textContent : '';
+  } while (marker);
+  return names;
+}
+
+function uploadBlob(path, file, onProgress) {
+  return getSasToken().then(sas => new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `${blobUrl(path)}?${sas}`);
+    xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
+    if (file.type) xhr.setRequestHeader('x-ms-blob-content-type', file.type);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`HTTP ${xhr.status}`));
+    xhr.onerror = () => reject(new Error('Error de red'));
+    xhr.send(file);
+  }));
+}
+
+async function deleteBlobPath(path) {
+  const sas = await getSasToken();
+  const res = await fetch(`${blobUrl(path)}?${sas}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) throw new Error('Error eliminando (' + res.status + ')');
+}
+
+async function deleteFolderPath(prefix) {
+  const names = await listAllUnderPrefix(prefix);
+  for (const name of names) await deleteBlobPath(name);
+}
+
+async function downloadBlobPath(path, filename) {
+  const sas = await getSasToken();
+  const res = await fetch(`${blobUrl(path)}?${sas}`);
+  if (!res.ok) throw new Error('Error al descargar');
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+// ---------- Lectura recursiva de carpetas arrastradas ----------
+function readEntryAsFiles(entry, basePath) {
+  return new Promise((resolve) => {
+    if (entry.isFile) {
+      entry.file(file => resolve([{ file, relativePath: basePath + entry.name }]), () => resolve([]));
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let collected = [];
+      const readBatch = () => {
+        reader.readEntries(async (batch) => {
+          if (batch.length === 0) {
+            const nested = await Promise.all(collected.map(e => readEntryAsFiles(e, basePath + entry.name + '/')));
+            resolve(nested.flat());
+          } else {
+            collected = collected.concat(batch);
+            readBatch();
+          }
+        }, () => resolve([]));
+      };
+      readBatch();
+    } else resolve([]);
+  });
+}
+
+async function getFilesFromDataTransfer(dataTransfer) {
+  const entries = Array.from(dataTransfer.items).map(i => i.webkitGetAsEntry?.()).filter(Boolean);
+  const nested = await Promise.all(entries.map(e => readEntryAsFiles(e, '')));
+  return nested.flat();
+}
+
+// ---------- UI: formato ----------
+function formatSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+function formatDate(httpDate) {
+  if (!httpDate) return '';
+  const d = new Date(httpDate);
+  return d.toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+}
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function showToast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ---------- UI: breadcrumb ----------
+function renderBreadcrumb() {
+  const nav = document.getElementById('breadcrumb');
+  nav.innerHTML = '';
+  const rootCrumb = document.createElement('span');
+  rootCrumb.className = 'crumb' + (currentPath === '' ? ' current' : '');
+  rootCrumb.textContent = CONFIG.containerName;
+  rootCrumb.onclick = () => navigateTo('');
+  nav.appendChild(rootCrumb);
+
+  const parts = currentPath.split('/').filter(Boolean);
+  let acc = '';
+  parts.forEach((part, idx) => {
+    acc += part + '/';
+    const sep = document.createElement('span');
+    sep.className = 'sep'; sep.textContent = '❯';
+    nav.appendChild(sep);
+    const crumb = document.createElement('span');
+    const isLast = idx === parts.length - 1;
+    crumb.className = 'crumb' + (isLast ? ' current' : '');
+    crumb.textContent = part;
+    const target = acc;
+    if (!isLast) crumb.onclick = () => navigateTo(target);
+    nav.appendChild(crumb);
+  });
+}
+
+// ---------- UI: lista de archivos ----------
+const ICON_FOLDER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>';
+const ICON_FILE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+const ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>';
+const ICON_DELETE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z"/></svg>';
+
+function renderList(folders, files) {
+  const tbody = document.getElementById('file-tbody');
+  const table = document.getElementById('file-table');
+  const empty = document.getElementById('empty-state');
+  tbody.innerHTML = '';
+
+  if (folders.length === 0 && files.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  table.style.display = 'table';
+  empty.style.display = 'none';
+
+  folders.sort().forEach(fullPrefix => {
+    const displayName = fullPrefix.slice(currentPath.length, -1);
+    const tr = document.createElement('tr');
+    tr.className = 'row-item row-folder';
+    tr.innerHTML = `
+      <td><div class="name-cell"><span class="icon">${ICON_FOLDER}</span><span class="label">${escapeHtml(displayName)}</span></div></td>
+      <td class="col-size">—</td>
+      <td class="col-date">—</td>
+      <td class="col-actions">
+        <button class="icon-btn danger" data-action="delete-folder" data-prefix="${escapeHtml(fullPrefix)}" title="Eliminar carpeta">${ICON_DELETE}</button>
+      </td>`;
+    tr.querySelector('.label').onclick = () => navigateTo(fullPrefix);
+    tbody.appendChild(tr);
+  });
+
+  files.sort((a, b) => a.name.localeCompare(b.name)).forEach(f => {
+    const displayName = f.name.slice(currentPath.length);
+    const tr = document.createElement('tr');
+    tr.className = 'row-item row-file';
+    tr.innerHTML = `
+      <td><div class="name-cell"><span class="icon">${ICON_FILE}</span><span class="label">${escapeHtml(displayName)}</span></div></td>
+      <td class="col-size">${formatSize(f.size)}</td>
+      <td class="col-date">${formatDate(f.lastModified)}</td>
+      <td class="col-actions">
+        <button class="icon-btn" data-action="download" data-path="${escapeHtml(f.name)}" data-name="${escapeHtml(displayName)}" title="Descargar">${ICON_DOWNLOAD}</button>
+        <button class="icon-btn danger" data-action="delete-file" data-path="${escapeHtml(f.name)}" title="Eliminar">${ICON_DELETE}</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Delegación de eventos para acciones de fila
+document.getElementById('file-tbody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  try {
+    if (action === 'download') {
+      await downloadBlobPath(btn.dataset.path, btn.dataset.name);
+    } else if (action === 'delete-file') {
+      if (!confirm(`¿Eliminar "${btn.dataset.path.split('/').pop()}"? Esta acción no se puede deshacer.`)) return;
+      await deleteBlobPath(btn.dataset.path);
+      showToast('Archivo eliminado', 'success');
+      await refresh();
+    } else if (action === 'delete-folder') {
+      const prefix = btn.dataset.prefix;
+      if (!confirm(`¿Eliminar la carpeta "${prefix}" y todo su contenido? Esta acción no se puede deshacer.`)) return;
+      await deleteFolderPath(prefix);
+      showToast('Carpeta eliminada', 'success');
+      await refresh();
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+// ---------- Navegación ----------
+async function navigateTo(path) {
+  currentPath = path;
+  renderBreadcrumb();
+  await refresh();
+}
+
+async function refresh() {
+  try {
+    const { folders, files } = await listBlobs(currentPath);
+    renderList(folders, files);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ---------- Panel de subida ----------
+const uploadRows = new Map();
+function openUploadPanel(title) {
+  document.getElementById('upload-panel-title').textContent = title;
+  document.getElementById('upload-panel').classList.add('visible');
+}
+function addUploadRow(relativePath) {
+  const rows = document.getElementById('upload-rows');
+  const row = document.createElement('div');
+  row.className = 'upload-row';
+  row.innerHTML = `
+    <div class="u-name">${escapeHtml(relativePath)}</div>
+    <div class="u-bar"><div class="u-bar-fill"></div></div>
+    <div class="u-status">Subiendo…</div>`;
+  rows.appendChild(row);
+  uploadRows.set(relativePath, row);
+}
+function updateUploadRow(relativePath, pct) {
+  const row = uploadRows.get(relativePath);
+  if (row) row.querySelector('.u-bar-fill').style.width = `${Math.round(pct * 100)}%`;
+}
+function markUploadDone(relativePath) {
+  const row = uploadRows.get(relativePath);
+  if (row) { row.classList.add('done'); row.querySelector('.u-status').textContent = 'Completado'; }
+}
+function markUploadError(relativePath, msg) {
+  const row = uploadRows.get(relativePath);
+  if (row) { row.classList.add('error'); row.querySelector('.u-status').textContent = msg; }
+}
+
+async function handleFilesToUpload(fileEntries) {
+  if (fileEntries.length === 0) return;
+  uploadRows.clear();
+  document.getElementById('upload-rows').innerHTML = '';
+  openUploadPanel(`Subiendo ${fileEntries.length} archivo(s)…`);
+  fileEntries.forEach(fe => addUploadRow(fe.relativePath));
+
+  let completed = 0, errors = 0;
+  const CONCURRENCY = 4;
+  let index = 0;
+
+  async function worker() {
+    while (index < fileEntries.length) {
+      const i = index++;
+      const { file, relativePath } = fileEntries[i];
+      const targetPath = currentPath + relativePath;
+      try {
+        await uploadBlob(targetPath, file, (pct) => updateUploadRow(relativePath, pct));
+        markUploadDone(relativePath);
+        completed++;
+      } catch (err) {
+        markUploadError(relativePath, err.message);
+        errors++;
+      }
+      document.getElementById('upload-panel-title').textContent =
+        `${completed + errors} / ${fileEntries.length} — ${errors ? errors + ' con error' : 'subiendo…'}`;
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, fileEntries.length) }, worker));
+  document.getElementById('upload-panel-title').textContent =
+    errors ? `Listo con ${errors} error(es)` : 'Subida completa';
+  showToast(errors ? `Subida terminada con ${errors} error(es)` : 'Subida completa', errors ? 'error' : 'success');
+  await refresh();
+}
+
+document.getElementById('upload-panel-close').onclick = () => {
+  document.getElementById('upload-panel').classList.remove('visible');
+};
+
+// ---------- Entradas: botón "Subir carpeta" ----------
+document.getElementById('browse-btn').onclick = () => document.getElementById('folder-input').click();
+document.getElementById('folder-input').addEventListener('change', (e) => {
+  const entries = Array.from(e.target.files).map(file => ({ file, relativePath: file.webkitRelativePath }));
+  e.target.value = '';
+  handleFilesToUpload(entries);
+});
+
+// ---------- Entradas: arrastrar y soltar en toda la ventana ----------
+let dragCounter = 0;
+window.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragCounter++;
+  document.getElementById('drag-target-path').textContent = '/' + currentPath;
+  document.body.classList.add('dragging');
+});
+window.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dragCounter = Math.max(0, dragCounter - 1);
+  if (dragCounter === 0) document.body.classList.remove('dragging');
+});
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  document.body.classList.remove('dragging');
+  const entries = await getFilesFromDataTransfer(e.dataTransfer);
+  handleFilesToUpload(entries);
+});
+
+// ---------- Init ----------
+document.getElementById('conn-account').textContent = CONFIG.accountName;
+document.getElementById('conn-container').textContent = CONFIG.containerName;
+renderBreadcrumb();
+refresh().catch(err => showToast('Revisa CONFIG, CORS y la Function App: ' + err.message, 'error'));
+</script>
+</body>
+</html>
